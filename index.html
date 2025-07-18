@@ -1,19 +1,199 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>纯图片分享</title>
-    <!-- 微信OG标签（关键部分） -->
-    <meta property="og:title" content=" " />
-    <meta property="og:description" content=" " />
-    <meta property="og:image" content="https://github.com/AhBai/picture/blob/main/983372401520151642132944ei18.png" />
-    <meta property="og:url" content="https://www.baidu.com/" />
-    <meta property="og:type" content="website" />
-    <!-- 隐藏网页内容 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信自定义分享演示</title>
+    
+    <!-- 基础OG标签（兜底内容） -->
+    <meta property="og:title" content="默认分享标题">
+    <meta property="og:description" content="默认分享描述（不超过40字）">
+    <meta property="og:image" content="https://github.com/AhBai/picture/blob/main/983372401520151642132944ei18.png">
+    <meta property="og:url" content="https://www.baidu.com">
+    
+    <!-- 微信专用标签（优先于OG标签） -->
+    <meta property="weixin:title" content="微信专属标题">
+    <meta property="weixin:image" content="https://yourdomain.com/weixin-share.jpg">
+    
+    <!-- 引入微信JS-SDK -->
+    <script src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js"></script>
+    
     <style>
-        body { display: none; }
+        body {
+            font-family: 'PingFang SC', sans-serif;
+            max-width: 750px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .share-btn {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 12px;
+            background-color: #07C160;
+            color: white;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .debug-info {
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
+    <h1>微信自定义分享演示</h1>
+    <p>这是一个演示如何自定义微信分享卡片的示例页面，点击下方按钮可手动触发分享配置。</p>
+    
+    <button class="share-btn" onclick="initWxShare()">初始化微信分享</button>
+    
+    <div class="debug-info">
+        <h3>调试信息：</h3>
+        <div id="debug-console"></div>
+    </div>
+
+    <script>
+        // 调试信息输出
+        function debugLog(message) {
+            const consoleDiv = document.getElementById('debug-console');
+            consoleDiv.innerHTML += `<p>[${new Date().toLocaleTimeString()}] ${message}</p>`;
+            console.log(message);
+        }
+
+        // 动态生成分享内容（可根据业务需求修改）
+        function generateShareData() {
+            const now = new Date();
+            const hour = now.getHours();
+            let timeGreeting;
+            
+            if (hour < 6) timeGreeting = "深夜好";
+            else if (hour < 12) timeGreeting = "早上好";
+            else if (hour < 18) timeGreeting = "下午好";
+            else timeGreeting = "晚上好";
+            
+            return {
+                friendTitle: `${timeGreeting}！发现一个精彩内容`,
+                friendDesc: "点击查看详情，更多惊喜等着你",
+                timelineTitle: `【推荐】${timeGreeting}精选内容`,
+                imageUrl: `https://yourdomain.com/share-${hour % 3 + 1}.jpg`,
+                queryParams: `from=share&t=${now.getTime()}`
+            };
+        }
+
+        // 获取微信配置（实际项目中需替换为你的后端API）
+        async function getWxConfig() {
+            const url = window.location.href.split('#')[0];
+            
+            // 模拟API请求 - 实际项目中替换为真实请求
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    // 注意：实际项目中签名应由后端生成！
+                    resolve({
+                        appId: 'YOUR_APPID', // 替换为你的公众号AppID
+                        timestamp: Math.floor(Date.now() / 1000),
+                        nonceStr: Math.random().toString(36).substr(2, 15),
+                        signature: 'SIMULATED_SIGNATURE' // 实际项目必须后端生成
+                    });
+                }, 300);
+            });
+        }
+
+        // 初始化微信分享
+        async function initWxShare() {
+            try {
+                debugLog("开始初始化微信分享...");
+                
+                // 1. 获取微信配置
+                const config = await getWxConfig();
+                if (!config.appId || !config.signature) {
+                    throw new Error("获取微信配置失败");
+                }
+                
+                // 2. 配置JS-SDK
+                wx.config({
+                    debug: true, // 开启调试模式（生产环境应设为false）
+                    appId: config.appId,
+                    timestamp: config.timestamp,
+                    nonceStr: config.nonceStr,
+                    signature: config.signature,
+                    jsApiList: [
+                        'updateAppMessageShareData',
+                        'updateTimelineShareData',
+                        'onMenuShareQQ',
+                        'onMenuShareWeibo'
+                    ]
+                });
+                
+                debugLog("JS-SDK配置完成，等待ready事件...");
+                
+                // 3. 微信SDK就绪后设置分享内容
+                wx.ready(() => {
+                    debugLog("微信JS-SDK ready");
+                    
+                    const shareData = generateShareData();
+                    const shareUrl = window.location.href.split('#')[0] + '?' + shareData.queryParams;
+                    
+                    // 3.1 好友/群聊分享配置
+                    wx.updateAppMessageShareData({
+                        title: shareData.friendTitle,
+                        desc: shareData.friendDesc,
+                        link: shareUrl,
+                        imgUrl: shareData.imageUrl,
+                        success: () => {
+                            debugLog("好友分享配置成功");
+                        },
+                        cancel: () => {
+                            debugLog("用户取消好友分享");
+                        }
+                    });
+                    
+                    // 3.2 朋友圈分享配置
+                    wx.updateTimelineShareData({
+                        title: shareData.timelineTitle,
+                        link: shareUrl,
+                        imgUrl: shareData.imageUrl,
+                        success: () => {
+                            debugLog("朋友圈分享配置成功");
+                        }
+                    });
+                    
+                    // 3.3 QQ分享配置（兼容）
+                    wx.onMenuShareQQ({
+                        title: shareData.friendTitle,
+                        desc: shareData.friendDesc,
+                        link: shareUrl,
+                        imgUrl: shareData.imageUrl
+                    });
+                    
+                    debugLog("所有分享配置已完成");
+                });
+                
+                // 4. 错误处理
+                wx.error((res) => {
+                    debugLog(`JS-SDK初始化失败: ${JSON.stringify(res)}`);
+                    
+                    // 降级方案：修改页面meta标签
+                    document.querySelector('meta[property="og:title"]').content = "降级分享标题";
+                    document.querySelector('meta[property="og:image"]').content = "https://yourdomain.com/fallback.jpg";
+                    debugLog("已启用OG标签降级方案");
+                });
+                
+            } catch (error) {
+                debugLog(`初始化失败: ${error.message}`);
+            }
+        }
+        
+        // 页面加载后自动初始化（可选）
+        document.addEventListener('DOMContentLoaded', () => {
+            debugLog("页面加载完成");
+            // 实际项目中建议用户手动触发，避免过早初始化导致签名失效
+            // initWxShare(); 
+        });
+    </script>
 </body>
 </html>
